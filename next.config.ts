@@ -8,6 +8,13 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  webpack: (config) => {
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      "process": require.resolve("process/browser"),
+    };
+    return config;
+  },
 };
 
 export default nextConfig;
