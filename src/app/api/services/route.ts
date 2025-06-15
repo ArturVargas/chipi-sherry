@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createMetadata, Metadata, ValidatedMetadata, type ExecutionResponse } from '@sherrylinks/sdk';
+import { createMetadata, Metadata, ValidatedMetadata } from '@sherrylinks/sdk';
 import { abi } from '@/blockchain/abi';
 import { celoAlfajores } from 'viem/chains';
 import { serialize } from 'wagmi';
 import { encodeFunctionData, TransactionSerializable, parseUnits } from 'viem';
 
+// Definir el tipo personalizado para la respuesta
+interface MultiTransactionResponse {
+  serializedTransaction: string[];
+  chainId: string;
+}
+
 const CONTRACT_ADDRESS = "0x5837d7635e7E9bf06245A75Ccd00A9a486Dd0b72";
+const USDC_ADDRESS = "0x2F25deB3848C207fc8E0c34035B3Ba7fC157602B"; // USDC en Alfajores
 
 export async function GET(req: NextRequest) {
     try {
@@ -34,6 +41,21 @@ export async function GET(req: NextRequest) {
                       type: 'text',
                       required: true,
                       description: 'Ingresa el numero de telefono de la recarga',
+                    },
+                    {
+                      name: 'carrier',
+                      label: 'Operador',
+                      type: 'select',
+                      required: true,
+                      description: 'Selecciona la operadora de la recarga',
+                      options: [
+                        { label: 'Telcel', value: 'telcel' },
+                        { label: 'Movistar', value: 'movistar' },
+                        { label: 'Claro', value: 'claro' },
+                        { label: 'Iusacell', value: 'iusacell' },
+                        { label: 'Nextel', value: 'nextel' },
+                        { label: 'PilloFon', value: 'pillofon' },
+                      ],
                     }
                   ],
             }
@@ -59,42 +81,71 @@ export async function GET(req: NextRequest) {
     try {
       const { searchParams } = new URL(req.url);
       const number = searchParams.get('number');
+      const carrier = searchParams.get('carrier');
   
-      if (!number) {
-        return NextResponse.json({ error: 'Number is required' }, { status: 400 });
+      if (!number || !carrier) {
+        return NextResponse.json({ error: 'Number and carrier are required' }, { status: 400 });
       }
+
+      const amount = parseUnits("1", 6);
   
-      // Codificar los datos de la función del contrato
-      const data = encodeFunctionData({
-        abi: abi,
-        functionName: 'processRecharge',
-        args: [parseUnits("1", 6), "recarga_1234", "telcel_10", "sherry"],
+      // Transacción de aprobación del USDC
+      const approveData = encodeFunctionData({
+        abi: [
+          {
+            name: 'approve',
+            type: 'function',
+            stateMutability: 'nonpayable',
+            inputs: [
+              { name: 'spender', type: 'address' },
+              { name: 'amount', type: 'uint256' }
+            ],
+            outputs: [{ type: 'bool' }]
+          }
+        ],
+        functionName: 'approve',
+        args: [CONTRACT_ADDRESS, amount],
       });
-  
-      // Crear transacción de interacción con contrato inteligente
-      const tx: TransactionSerializable = {
-        to: CONTRACT_ADDRESS,
-        data: data,
+
+      const approveTx: TransactionSerializable = {
+        to: USDC_ADDRESS,
+        data: approveData,
         chainId: celoAlfajores.id,
         type: 'legacy',
       };
   
-      const serialized = serialize(tx);
+      // Codificar los datos de la función del contrato
+      const rechargeData = encodeFunctionData({
+        abi: abi,
+        functionName: 'processRecharge',
+        args: [amount, "recarga_1234", carrier, "sherry"],
+      });
+  
+      // Crear transacción de interacción con contrato inteligente
+      const rechargeTx: TransactionSerializable = {
+        to: CONTRACT_ADDRESS,
+        data: rechargeData,
+        chainId: celoAlfajores.id,
+        type: 'legacy',
+      };
+  
+      const serializedApprove = serialize(approveTx);
+      const serializedRecharge = serialize(rechargeTx);
 
-    // Crear respuesta
-    const resp: ExecutionResponse = {
-      serializedTransaction: serialized,
-      chainId: celoAlfajores.name,
-    };
+      // Crear respuesta con array de transacciones
+      const resp: MultiTransactionResponse = {
+        serializedTransaction: [serializedApprove, serializedRecharge],
+        chainId: celoAlfajores.name,
+      };
 
-    return NextResponse.json(resp, {
-      status: 200,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-      },
-    });
+      return NextResponse.json(resp, {
+        status: 200,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        },
+      });
     } catch (error) {
         console.error('Error en petición POST:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
