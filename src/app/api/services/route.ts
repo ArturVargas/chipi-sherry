@@ -6,13 +6,13 @@ import { serialize } from 'wagmi';
 import { encodeFunctionData, TransactionSerializable, parseUnits } from 'viem';
 
 // Definir el tipo personalizado para la respuesta
-interface MultiTransactionResponse {
+/* interface MultiTransactionResponse {
   serializedTransaction: string[];
   chainId: string;
-}
+} */
 
 const CONTRACT_ADDRESS = "0x5837d7635e7E9bf06245A75Ccd00A9a486Dd0b72";
-const USDC_ADDRESS = "0x2F25deB3848C207fc8E0c34035B3Ba7fC157602B"; // USDC en Alfajores
+// const USDC_ADDRESS = "0x2F25deB3848C207fc8E0c34035B3Ba7fC157602B"; // USDC en Alfajores
 
 export async function GET(req: NextRequest) {
     try {
@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
         actions: [
             {
                 type: 'dynamic',
-                label: 'Comprar Recarga',
+                label: 'Comprar Recarga de 20 MXN',
                 description: 'Compra una recarga de celular con crypto',
                 chains: { source: 'alfajores'},
                 path: '/api/services',
@@ -90,7 +90,7 @@ export async function GET(req: NextRequest) {
       const amount = parseUnits("1", 6);
   
       // Transacción de aprobación del USDC
-      const approveData = encodeFunctionData({
+      /* const approveData = encodeFunctionData({
         abi: [
           {
             name: 'approve',
@@ -105,14 +105,14 @@ export async function GET(req: NextRequest) {
         ],
         functionName: 'approve',
         args: [CONTRACT_ADDRESS, amount],
-      });
+      }); */
 
-      const approveTx: TransactionSerializable = {
-        to: USDC_ADDRESS,
-        data: approveData,
-        chainId: celoAlfajores.id,
-        type: 'legacy',
-      };
+      /*   const approveTx: TransactionSerializable = {
+          to: USDC_ADDRESS,
+          data: approveData,
+          chainId: celoAlfajores.id,
+          type: 'legacy',
+        }; */
   
       // Codificar los datos de la función del contrato
       const rechargeData = encodeFunctionData({
@@ -129,12 +129,12 @@ export async function GET(req: NextRequest) {
         type: 'legacy',
       };
   
-      const serializedApprove = serialize(approveTx);
+      //const serializedApprove = serialize(approveTx);
       const serializedRecharge = serialize(rechargeTx);
 
       // Crear respuesta con array de transacciones
-      const resp: MultiTransactionResponse = {
-        serializedTransaction: [serializedApprove, serializedRecharge],
+      const resp = {
+        serializedTransaction: serializedRecharge,
         chainId: celoAlfajores.name,
       };
 
